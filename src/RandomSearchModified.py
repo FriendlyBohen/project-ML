@@ -4,12 +4,9 @@ import numpy as np
 from sklearn.model_selection import KFold
 from RandomSearch import sample_from_range
 
-def RandomSearchModified(df, num_splits, estimator, param_ranges, scoring, target_column, verbose, n_iter_initial, n_iter_refined, top_percentage=0.1, refine_range_percentage=0.2):
+def RandomSearchModified(df, num_splits, estimator, param_ranges, scoring, verbose, n_iter_initial, n_iter_refined, X_train_split, y_train_split, top_percentage=0.1, refine_range_percentage=0.2):
     best_score = -float('inf')
     best_params = None
-
-    X = df.drop(columns=[target_column])
-    y = df[target_column]
 
     kf = KFold(n_splits=num_splits, shuffle=True, random_state=42)
 
@@ -24,13 +21,13 @@ def RandomSearchModified(df, num_splits, estimator, param_ranges, scoring, targe
         estimator.set_params(**params)
 
         fold_scores = []
-        for train_idx, val_idx in kf.split(X):
-            X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]
-            y_train, y_val = y.iloc[train_idx], y.iloc[val_idx]
+        for train_idx, val_idx in kf.split(X_train_split):
+            X_train, X_val = X_train_split.iloc[train_idx], X_train_split.iloc[val_idx]
+            y_train, y_val = y_train_split.iloc[train_idx], y_train_split.iloc[val_idx]
 
             estimator.fit(X_train, y_train)
             y_pred = estimator.predict(X_val)
-            score = scoring(y_val, y_pred)
+            score = scoring._score_func(y_val, y_pred)
             fold_scores.append(score)
 
         avg_score = sum(fold_scores) / num_splits
@@ -66,13 +63,13 @@ def RandomSearchModified(df, num_splits, estimator, param_ranges, scoring, targe
             estimator.set_params(**params)
 
             fold_scores = []
-            for train_idx, val_idx in kf.split(X):
-                X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]
-                y_train, y_val = y.iloc[train_idx], y.iloc[val_idx]
+            for train_idx, val_idx in kf.split(X_train_split):
+                X_train, X_val = X_train_split.iloc[train_idx], X_train_split.iloc[val_idx]
+                y_train, y_val = y_train_split.iloc[train_idx], y_train_split.iloc[val_idx]
 
                 estimator.fit(X_train, y_train)
                 y_pred = estimator.predict(X_val)
-                score = scoring(y_val, y_pred)
+                score = scoring._score_func(y_val, y_pred)
                 fold_scores.append(score)
 
             avg_score = sum(fold_scores) / num_splits
@@ -80,8 +77,9 @@ def RandomSearchModified(df, num_splits, estimator, param_ranges, scoring, targe
             if avg_score > best_score:
                 best_score = avg_score
                 best_params = copy.deepcopy(params)
+                best_model = estimator
 
             if verbose:
                 print(f"Iteration {i+1}/{n_iter_refined}, Best Score: {best_score}, Best Params: {best_params}, Params: {params}, avg score: {avg_score}")
 
-    return best_params, best_score
+    return best_params, best_score, best_model
